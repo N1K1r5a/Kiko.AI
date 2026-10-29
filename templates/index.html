@@ -1,0 +1,255 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kiko </title>
+
+    <style>
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: "Segoe UI", Arial, sans-serif;
+            background: #f8f5ff;
+            color: #49415b;
+        }
+
+        .app {
+            width: 100%;
+            max-width: 760px;
+            height: 85vh;
+            min-height: 500px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: white;
+            border: 1px solid #eee6fc;
+            border-radius: 25px;
+            box-shadow: 0 12px 40px #d9ccef55;
+        }
+
+        header {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 22px;
+            background: #eee7ff;
+            border-bottom: 1px solid #e4daf8;
+        }
+
+        .avatar {
+            width: 52px;
+            height: 52px;
+            display: grid;
+            place-items: center;
+            flex-shrink: 0;
+            border-radius: 18px;
+            background: #d9c8ff;
+            font-size: 27px;
+        }
+
+        h1 {
+            margin: 0 0 4px;
+            font-size: 24px;
+            color: #65518d;
+        }
+
+        .status {
+            margin: 0;
+            font-size: 13px;
+            color: #81749b;
+        }
+
+        #chat {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .message {
+            max-width: 82%;
+            padding: 13px 17px;
+            border-radius: 19px;
+            line-height: 1.5;
+            overflow-wrap: anywhere;
+            white-space: pre-wrap;
+        }
+
+        .kiko {
+            align-self: flex-start;
+            background: #f0eaff;
+            border-bottom-left-radius: 6px;
+        }
+
+        .user {
+            align-self: flex-end;
+            background: #dcd0ff;
+            border-bottom-right-radius: 6px;
+        }
+
+        .composer {
+            display: flex;
+            gap: 10px;
+            padding: 16px;
+            background: #fdfcff;
+            border-top: 1px solid #eee6fc;
+        }
+
+        #messageInput {
+            flex: 1;
+            min-width: 0;
+            padding: 14px 17px;
+            border: 1px solid #ded2f5;
+            border-radius: 18px;
+            outline: none;
+            font: inherit;
+            color: #49415b;
+            background: white;
+        }
+
+        #messageInput:focus {
+            border-color: #a993df;
+            box-shadow: 0 0 0 3px #eee7ff;
+        }
+
+        button {
+            padding: 0 22px;
+            border: none;
+            border-radius: 17px;
+            background: #b9a3ee;
+            color: #302448;
+            font: inherit;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        button:hover { background: #aa91e8; }
+        button:disabled { opacity: 0.6; cursor: wait; }
+
+        @media (max-width: 500px) {
+            body { padding: 0; }
+            .app {
+                height: 100vh;
+                min-height: 0;
+                border-radius: 0;
+            }
+            header { padding: 18px; }
+            #chat { padding: 18px; }
+            .composer { padding: 12px; }
+        }
+    </style>
+</head>
+
+<body>
+    <main class="app">
+        <header>
+            <div class="avatar">💜</div>
+            <div>
+                <h1>Kiko</h1>
+                <p class="status">Your little corner of calm</p>
+            </div>
+        </header>
+
+        <section id="chat" aria-live="polite">
+            <div class="message kiko">Hi! I'm Kiko 💜
+
+I'm here and ready to chat with you!</div>
+        </section>
+
+        <form class="composer" id="chatForm">
+            <input
+                id="messageInput"
+                type="text"
+                placeholder="Message Kiko..."
+                autocomplete="off"
+                aria-label="Your message"
+                required
+            >
+            <button type="submit">Send</button>
+        </form>
+    </main>
+
+    <script>
+        const chat = document.getElementById("chat");
+        const form = document.getElementById("chatForm");
+        const input = document.getElementById("messageInput");
+        const sendButton = form.querySelector("button");
+        const history = [];
+
+        form.addEventListener("submit", async function (event) {
+            event.preventDefault();
+
+            const message = input.value.trim();
+            if (!message) return;
+
+            addMessage(message, "user");
+            history.push({ role: "user", content: message });
+
+            input.value = "";
+            input.disabled = true;
+            sendButton.disabled = true;
+            sendButton.textContent = "Thinking...";
+
+            try {
+                const response = await fetch("/chat", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        messages: history.slice(-20)
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(
+                        data.error || "Something went wrong."
+                    );
+                }
+
+                addMessage(data.reply, "kiko");
+                history.push({
+                    role: "assistant",
+                    content: data.reply
+                });
+
+            } catch (error) {
+                addMessage(
+                    "I couldn't connect just now: " +
+                    error.message + " 💜",
+                    "kiko"
+                );
+                history.pop();
+
+            } finally {
+                input.disabled = false;
+                sendButton.disabled = false;
+                sendButton.textContent = "Send";
+                input.focus();
+            }
+        });
+
+        function addMessage(text, type) {
+            const bubble = document.createElement("div");
+            bubble.className = "message " + type;
+            bubble.textContent = text;
+            chat.appendChild(bubble);
+            chat.scrollTop = chat.scrollHeight;
+        }
+    </script>
+</body>
+</html>
+
